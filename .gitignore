@@ -13,7 +13,7 @@ mlruns/
 mlartifacts/
 
 # Local datasets
-data/
+/data/
 
 # IDE
 .vscode/
