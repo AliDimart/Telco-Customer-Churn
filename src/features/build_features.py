@@ -12,7 +12,7 @@ def build_preprocessor(X_train: pd.DataFrame) -> ColumnTransformer:
     - encodes categorical columns with OneHotEncoder  
     """
     categorical_cols = X_train.select_dtypes(include='object').columns
-    numeric_cols = X_train.select_dtypes(include='number').columns
+    numeric_cols = X_train.select_dtypes(include=['number','bool']).columns
 
     preprocessor = ColumnTransformer(
         transformers=[

@@ -13,7 +13,7 @@ def preprocess_data(df: pd.DataFrame, target_col: str = 'Churn') -> pd.DataFrame
     df.columns = df.columns.str.strip()
     target_col = target_col.strip()
 
-    df = df.drop(columns=['customer_ID'], axis=1)
+    df = df.drop(columns=['customer_ID'], errors="ignore")
 
     if target_col in df.columns and df[target_col].dtype == 'object':
         df[target_col] = df[target_col].str.strip().str.lower().map({'yes' : 1, 'no' : 0})
@@ -23,8 +23,5 @@ def preprocess_data(df: pd.DataFrame, target_col: str = 'Churn') -> pd.DataFrame
 
     if "SeniorCitizen" in df.columns:
         df["SeniorCitizen"] = df["SeniorCitizen"].fillna(0).astype(int)
-
-    num_cols = df.select_dtypes(include='number').columns
-    df[num_cols] = df[num_cols].fillna(0)
 
     return df
