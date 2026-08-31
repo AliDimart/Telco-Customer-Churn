@@ -1,13 +1,14 @@
-import pandas as pd
-from sklearn.metrics import classification_report, roc_auc_score, recall_score
+from sklearn.metrics import classification_report, confusion_matrix
 
+def evaluate_model(model, X_test, y_test):
+    """
+    Evaluates an XGBoost model on test data.
 
-def evaluate_model(model, X_test: pd.DataFrame, y_test: pd.Series) -> None:
-
-    y_pred = model.predict(X_test)
-    y_proba = model.predict_proba(X_test)[:, 1]
-
-    print(classification_report(y_test, y_pred))
-
-    print('Recall:', recall_score(y_test, y_pred))
-    print('ROC-AUC:', roc_auc_score(y_test, y_proba))
+    Args:
+        model: Trained model.
+        X_test: Test features.
+        y_test: Test labels.
+    """
+    preds = model.predict(X_test)
+    print("Classification Report:\n", classification_report(y_test, preds))
+    print("Confusion Matrix:\n", confusion_matrix(y_test, preds))
