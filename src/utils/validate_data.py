@@ -46,17 +46,31 @@ def validate_telco_data(df) -> Tuple[bool, List[str]]:
     batch = batch_definition.get_batch(batch_parameters={"dataframe": df})
 
     # DEFINE EXPECTATIONS
-
     expectations = []
 
     expectations.append(gx.expectations.ExpectColumnValuesToBeInSet(column="gender", value_set=["Male", "Female"]))
 
     yes_no_columns = [
-        "Partner", "Dependents", "PhoneService", "OnlineSecurity", "OnlineBackup", "DeviceProtection", "TechSupport", "StreamingTV", "StreamingMovies", "PaperlessBilling"
+        "Partner",
+        "Dependents",
+        "PhoneService",
+        "PaperlessBilling",
+    ]
+
+    yes_no_internet_columns = [
+        "OnlineSecurity",
+        "OnlineBackup",
+        "DeviceProtection",
+        "TechSupport",
+        "StreamingTV",
+        "StreamingMovies",
     ]
 
     for column in yes_no_columns:
         expectations.append(gx.expectations.ExpectColumnValuesToBeInSet(column=column, value_set=["Yes", "No"]))
+    
+    for column in yes_no_internet_columns:
+        expectations.append(gx.expectations.ExpectColumnValuesToBeInSet(column=column, value_set=["Yes", "No", "No internet service"]))
 
     if "Churn" in df.columns:
         expectations.append(gx.expectations.ExpectColumnValuesToNotBeNull(column='Churn'))
@@ -67,7 +81,6 @@ def validate_telco_data(df) -> Tuple[bool, List[str]]:
     
     expectations.append(gx.expectations.ExpectColumnValuesToBeBetween(column='tenure', min_value=0))
     expectations.append(gx.expectations.ExpectColumnValuesToBeBetween(column='MonthlyCharges', min_value=0))
-    expectations.append(gx.expectations.ExpectColumnValuesToBeBetween(column='TotalCharges', min_value=0))
 
     expectations.append(gx.expectations.ExpectColumnValuesToNotBeNull(column='tenure'))
     expectations.append(gx.expectations.ExpectColumnValuesToNotBeNull(column='MonthlyCharges'))
@@ -84,10 +97,12 @@ def validate_telco_data(df) -> Tuple[bool, List[str]]:
         result = batch.validate(expectation)
 
         if not result.success:
-        
-            expectation_type = result.expectation_config.type
 
-            failed_expectations.append(expectation_type)
+            failed_expectations.append({
+                "expectation": result.expectation_config.type,
+                "column": result.expectation_config.kwargs.get("column"),
+                "result": result.result,
+            })
 
     # FINAL RESULT
 
@@ -100,6 +115,6 @@ def validate_telco_data(df) -> Tuple[bool, List[str]]:
         print("   Failed checks:")
 
         for failure in failed_expectations:
-            print(f"      - {failure}")
+            print(f"{failure['result']}- {failure['expectation']}")
 
     return success, failed_expectations

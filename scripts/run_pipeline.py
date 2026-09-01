@@ -1,14 +1,11 @@
 import sys
 import argparse
 import mlflow
-import joblib
 import json
 import time
 from pathlib import Path
 
-from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split
-from xgboost import XGBClassifier
 from sklearn.metrics import (
     classification_report, precision_score, recall_score,
     f1_score, roc_auc_score
@@ -22,8 +19,8 @@ sys.path.append(str(project_root))
 # Local modules - Core pipeline components
 from src.data.load_data import load_data                    # Data loading with error handling
 from src.data.preprocess import preprocess_data            # Basic data cleaning
-from src.features.build_features import build_preprocessor     # Feature engineering (CRITICAL for model performance)
 from src.utils.validate_data import validate_telco_data    # Data quality validation
+from src.models.train import train_model    # Model training
 
 def main(args):
     """
@@ -82,54 +79,8 @@ def main(args):
 
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=args.test_size, random_state=101, stratify=y)
         
-        # Numerical imputation + categorical imputation and one-hot encoding
-        preprocessor = build_preprocessor(X_train)
-
-        # === CRITICAL: Handle Class Imbalance ===
-        # Calculate scale_pos_weight to handle imbalanced dataset
-        # This tells XGBoost to give more weight to the minority class (churners)
-        scale_pos_weight = (y_train == 0).sum() / (y_train == 1).sum()
-        mlflow.log_param("scale_pos_weight", scale_pos_weight)
-        print(f"Class imbalance ratio: {scale_pos_weight:.2f} (applied to positive class)")
-
-        # === STAGE 4: Model Training ===
-        print("🤖 Training XGBoost model...")
-        
-        # IMPORTANT: These hyperparameters were optimized through hyperparameter tuning
-        # In production, consider using hyperparameter optimization tools like Optuna
-        model = XGBClassifier(
-            # Tree structure parameters
-            n_estimators=301,        # Number of trees (OPTIMIZED)
-            learning_rate=0.034,     # Step size shrinkage (OPTIMIZED)  
-            max_depth=7,            # Maximum tree depth (OPTIMIZED)
-            
-            # Regularization parameters
-            subsample=0.95,         # Sample ratio of training instances
-            colsample_bytree=0.98,  # Sample ratio of features for each tree
-            
-            # Performance parameters
-            n_jobs=-1,              # Use all CPU cores
-            random_state=42,        # Reproducible results
-            eval_metric="logloss",  # Evaluation metric
-            
-            # ESSENTIAL: Handle class imbalance
-            scale_pos_weight=scale_pos_weight  # Weight for positive class (churners)
-        )
-        
-        pipeline = Pipeline([
-            ("preprocessor", preprocessor),
-            ("model", model),
-        ])
-        
-        # === Train Model and Track Training Time ===
-        t0 = time.time()
-        pipeline.fit(X_train, y_train)
-        train_time = time.time() - t0
-        mlflow.log_metric("train_time", train_time)  # Track training performance
-        print(f"✅ Model trained in {train_time:.2f} seconds")
-
-        # === STAGE 6: Model Evaluation ===
-        print("📊 Evaluating model performance...")
+        # Creating Pipeline
+        pipeline = train_model(X_train, y_train)
         
         # Generate predictions and track inference time
         t1 = time.time()
@@ -163,13 +114,13 @@ def main(args):
         # ESSENTIAL: Log model in MLflow's standard format for serving
         mlflow.sklearn.log_model(
             pipeline, 
-            name="churn_pipeline"  # This creates a 'model/' folder in MLflow run artifacts
+            name="churn_pipeline",  # This creates a 'model/' folder in MLflow run artifacts
+            serialization_format="cloudpickle"
         )
         print("✅ Model saved to MLflow for serving pipeline")
 
         # === Final Performance Summary ===
         print(f"\n⏱️  Performance Summary:")
-        print(f"   Training time: {train_time:.2f}s")
         print(f"   Inference time: {pred_time:.4f}s")
         print(f"   Samples per second: {len(X_test)/pred_time:.0f}")
         

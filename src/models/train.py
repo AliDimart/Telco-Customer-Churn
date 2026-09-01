@@ -1,48 +1,76 @@
+import time
 import mlflow
 import pandas as pd
-import mlflow.xgboost
-from mlflow.data import from_pandas
-from xgboost import XGBClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, recall_score
 
-def train_model(df: pd.DataFrame, target_col: str):
+from src.features.build_features import build_preprocessor     # Feature engineering (CRITICAL for model performance)
+from sklearn.pipeline import Pipeline
+from xgboost import XGBClassifier
+
+
+def train_model(X_train: pd.DataFrame, y_train: pd.Series) -> Pipeline:
     """
-    Trains an XGBoost model and logs with MLflow.
+    Trains Pipeline that contains Preprocessor + XGBoost model and logs with MLflow.
 
     Args:
-        df (pd.DataFrame): Feature dataset.
-        target_col (str): Name of the target column.
+        X_train (pd.DataFrame): Feature dataset.
+        y_train (pd.Series): Target column.
     """
-    X = df.drop(columns=[target_col])
-    y = df[target_col]
+    # Numerical imputation + categorical imputation and one-hot encoding
+    preprocessor = build_preprocessor(X_train)
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    # === CRITICAL: Handle Class Imbalance ===
+    # Calculate scale_pos_weight to handle imbalanced dataset
+    # This tells XGBoost to give more weight to the minority class (churners)
+    scale_pos_weight = (y_train == 0).sum() / (y_train == 1).sum()
 
+    # === STAGE 4: Model Training ===
+    print("🤖 Training XGBoost model...")
+    
+    # IMPORTANT: These hyperparameters were optimized through hyperparameter tuning
+    # In production, consider using hyperparameter optimization tools like Optuna
     model = XGBClassifier(
-        n_estimators=300,
-        learning_rate=0.1,
-        max_depth=6,
-        random_state=42,
-        n_jobs=-1,
-        eval_metric="logloss"
+        # Tree structure parameters
+        n_estimators=301,        # Number of trees (OPTIMIZED)
+        learning_rate=0.034,     # Step size shrinkage (OPTIMIZED)  
+        max_depth=7,            # Maximum tree depth (OPTIMIZED)
+        
+        # Regularization parameters
+        subsample=0.95,         # Sample ratio of training instances
+        colsample_bytree=0.98,  # Sample ratio of features for each tree
+        
+        # Performance parameters
+        n_jobs=-1,              # Use all CPU cores
+        random_state=42,        # Reproducible results
+        eval_metric="logloss",  # Evaluation metric
+        
+        # ESSENTIAL: Handle class imbalance
+        scale_pos_weight=scale_pos_weight  # Weight for positive class (churners)
     )
+    
+    # Create pipeline to connect Preprocessor + XGBoost
+    pipeline = Pipeline([
+        ("preprocessor", preprocessor),
+        ("model", model),
+    ])
+    
+    # === Train Model and Track Training Time ===
+    print("🤖 Training XGBoost pipeline...")
 
-    with mlflow.start_run():
-        # Train model
-        model.fit(X_train, y_train)
-        preds = model.predict(X_test)
-        acc = accuracy_score(y_test, preds)
-        rec = recall_score(y_test, preds)
+    start_time = time.perf_counter()
+    pipeline.fit(X_train, y_train)
+    train_time = time.perf_counter() - start_time
 
-        # Log params, metrics, and model
-        mlflow.log_param("n_estimators", 300)
-        mlflow.log_metric("accuracy", acc)
-        mlflow.log_metric("recall", rec)
-        mlflow.xgboost.log_model(model, "model")
+    print(f"✅ Model trained in {train_time:.2f} seconds")
 
-        # 🔑 Log dataset so it shows in MLflow UI
-        train_ds = from_pandas(df, source="training_data")
-        mlflow.log_input(train_ds, context="training")
+    mlflow.log_params({
+        "n_estimators": 301,
+        "learning_rate": 0.034,
+        "max_depth": 7,
+        "subsample": 0.95,
+        "colsample_bytree": 0.98,
+        "scale_pos_weight": scale_pos_weight,
+    })
 
-        print(f"Model trained. Accuracy: {acc:.4f}, Recall: {rec:.4f}")
+    mlflow.log_metric("train_time", train_time)
+
+    return pipeline
