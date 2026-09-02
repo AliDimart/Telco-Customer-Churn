@@ -2,14 +2,10 @@ import sys
 import argparse
 import mlflow
 import json
-import time
+import joblib
 from pathlib import Path
 
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import (
-    classification_report, precision_score, recall_score,
-    f1_score, roc_auc_score
-)
 
 # === Fix import path for local modules ===
 # ESSENTIAL: Allows imports from src/ directory structure
@@ -17,10 +13,24 @@ project_root = Path(__file__).resolve().parent.parent
 sys.path.append(str(project_root))
 
 # Local modules - Core pipeline components
-from src.data.load_data import load_data                    # Data loading with error handling
+from src.data.load_data import load_data                   # Data loading with error handling
 from src.data.preprocess import preprocess_data            # Basic data cleaning
 from src.utils.validate_data import validate_telco_data    # Data quality validation
-from src.models.train import train_model    # Model training
+from src.models.train import train_model                   # Model training
+from src.models.evaluate import evaluate_model             # Model evaluation
+
+
+def load_best_params(path: Path) -> dict:
+    if not path.exists():
+        print("ℹ️ Optuna parameters not found. Using default model parameters.")
+        return None
+
+    with open(path, "r") as file:
+        params = json.load(file)
+
+    print("✅ Optuna parameters loaded.")
+    return params
+
 
 def main(args):
     """
@@ -35,12 +45,14 @@ def main(args):
 
     with mlflow.start_run():
         # === Log hyperparameters and configuration ===
+
         # REQUIRED: These parameters are essential for model reproducibility
         mlflow.log_param("model", "xgboost")           # Model type for comparison
         mlflow.log_param("threshold", args.threshold)   # Classification threshold (default: 0.35)
         mlflow.log_param("test_size", args.test_size)   # Train/test split ratio
 
         # === STAGE 1: Data Loading & Validation ===
+
         print("🔄 Loading data...")
         df = load_data(args.input)  # Load raw CSV data with error handling
         print(f"✅ Data loaded: {df.shape[0]} rows, {df.shape[1]} columns")
@@ -59,6 +71,7 @@ def main(args):
             print("✅ Data validation passed. Logged to MLflow.")
 
         # === STAGE 2: Data Preprocessing ===
+
         print("🔧 Preprocessing data...")
         df = preprocess_data(df)  # Basic cleaning (handle missing values, fix data types)
 
@@ -68,7 +81,8 @@ def main(args):
         df.to_csv(processed_path, index=False)
         print(f"✅ Processed dataset saved to {processed_path} | Shape: {df.shape}")
 
-        # === STAGE 3: Data Split and Preprocessing ===
+        # === STAGE 3: Data Split ===
+
         print("🛠️  Building features...")
         target = args.target
         if target not in df.columns:
@@ -79,60 +93,43 @@ def main(args):
 
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=args.test_size, random_state=101, stratify=y)
         
-        # Creating Pipeline
-        pipeline = train_model(X_train, y_train)
-        
-        # Generate predictions and track inference time
-        t1 = time.time()
-        proba = pipeline.predict_proba(X_test)[:, 1]  # Get probability of churn (class 1)
-        
-        # Apply classification threshold (default: 0.35, optimized for churn detection)
-        # Lower threshold = more sensitive to churn (higher recall, lower precision)
-        y_pred = (proba >= args.threshold).astype(int)
-        pred_time = time.time() - t1
-        mlflow.log_metric("pred_time", pred_time)  # Track inference performance
+        # === STAGE 4: Creating Pipeline and evaluating the model ===
 
-        # === CRITICAL: Log Evaluation Metrics to MLflow ===
-        # These metrics are essential for model comparison and monitoring
-        precision = precision_score(y_test, y_pred, zero_division=0)    # Of predicted churners, how many actually churned?
-        recall = recall_score(y_test, y_pred, zero_division=0)          # Of actual churners, how many did we catch?
-        f1 = f1_score(y_test, y_pred, zero_division=0)                  # Harmonic mean of precision and recall
-        roc_auc = roc_auc_score(y_test, proba)         # Area under ROC curve (threshold-independent)
-        
-        # Log all metrics for experiment tracking
-        mlflow.log_metric("precision", precision)
-        mlflow.log_metric("recall", recall) 
-        mlflow.log_metric("f1", f1)
-        mlflow.log_metric("roc_auc", roc_auc)
-        
-        print(f"🎯 Model Performance:")
-        print(f"   Precision: {precision:.3f} | Recall: {recall:.3f}")
-        print(f"   F1 Score: {f1:.3f} | ROC AUC: {roc_auc:.3f}")
+        # Trying to read params tuned by optuna
+        params_path = project_root / "artifacts" / "best_params.json"
+        params = load_best_params(params_path)
 
-        # === STAGE 7: Model Serialization and Logging ===
+        # Training preprocessor + xgboost
+        pipeline = train_model(X_train, y_train, params)
+
+        
+        evaluate_model(pipeline, X_test, y_test, args.threshold)
+
+        # === STAGE 5: Model Serialization and Logging ===
+
         print("💾 Saving model to MLflow...")
         # ESSENTIAL: Log model in MLflow's standard format for serving
         mlflow.sklearn.log_model(
-            pipeline, 
+            pipeline,
             name="churn_pipeline",  # This creates a 'model/' folder in MLflow run artifacts
             serialization_format="cloudpickle"
         )
         print("✅ Model saved to MLflow for serving pipeline")
 
-        # === Final Performance Summary ===
-        print(f"\n⏱️  Performance Summary:")
-        print(f"   Inference time: {pred_time:.4f}s")
-        print(f"   Samples per second: {len(X_test)/pred_time:.0f}")
-        
-        print(f"\n Detailed Classification Report:")
-        print(classification_report(y_test, y_pred, digits=3))
+        # Saving model 
+        model_path = project_root / "models" / "churn_pipeline.joblib"
+        model_path.parent.mkdir(parents=True, exist_ok=True)
+
+        joblib.dump(pipeline, model_path)
+
+        print(f"✅ Model saved to {model_path}")
 
 
 if __name__ == '__main__':
 
     p = argparse.ArgumentParser(description="Run churn pipeline with XGBoost + MLflow")
 
-    p.add_argument("--input", type=str, default="data/raw/Telco-Customer-Churn.csv", help="path to CSV")
+    p.add_argument("--input", type=str, default="data/raw/Telco-Customer-Churn.csv", help="Path to CSV")
     p.add_argument("--target", type=str, default="Churn")
     p.add_argument("--threshold", type=float, default=0.35)
     p.add_argument("--test_size", type=float, default=0.2)
@@ -142,11 +139,3 @@ if __name__ == '__main__':
 
     args = p.parse_args()
     main(args)
-
-
-"""
-# Use this below to run the pipeline:
-
-python scripts/run_pipeline.py 
-
-"""

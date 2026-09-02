@@ -12,8 +12,11 @@ def preprocess_data(df: pd.DataFrame, target_col: str = 'Churn') -> pd.DataFrame
     """
     df.columns = df.columns.str.strip()
     target_col = target_col.strip()
-
-    df = df.drop(columns=['customer_ID'], errors="ignore")
+    
+    # drop ids if present
+    for col in ["customerID", "CustomerID", "customer_id"]:
+        if col in df.columns:
+            df = df.drop(columns=[col])
 
     if target_col in df.columns and df[target_col].dtype == 'object':
         df[target_col] = df[target_col].str.strip().str.lower().map({'yes' : 1, 'no' : 0})
