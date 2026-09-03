@@ -1,9 +1,12 @@
 # Virtual environment
 .venv/
+venv/
+env/
 
 # Python
 __pycache__/
 *.py[cod]
+*.pyo
 
 # Jupyter
 .ipynb_checkpoints/
@@ -14,7 +17,7 @@ mlartifacts/
 
 # Local datasets
 /data/
-models/
+artifacts/
 
 # IDE
 .vscode/

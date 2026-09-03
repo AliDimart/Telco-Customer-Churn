@@ -176,20 +176,18 @@ demo = gr.Interface(
         gr.Dropdown(["Yes", "No", "No internet service"], label="Tech Support", value="No"),
         gr.Dropdown(["Yes", "No", "No internet service"], label="Streaming TV", value="Yes"),
         gr.Dropdown(["Yes", "No", "No internet service"], label="Streaming Movies", value="Yes"),
-        gr.Dropdown([0, 1], label="Senior Citizen", value=0),
         
         # Contract and billing section (major churn factors)
         gr.Dropdown(["Month-to-month", "One year", "Two year"], label="Contract", value="Month-to-month"),
         gr.Dropdown(["Yes", "No"], label="Paperless Billing", value="Yes"),
-        gr.Dropdown([
-            "Electronic check", "Mailed check",
-            "Bank transfer (automatic)", "Credit card (automatic)"
-        ], label="Payment Method", value="Electronic check"),
+        gr.Dropdown(["Electronic check", "Mailed check", "Bank transfer (automatic)", "Credit card (automatic)"], 
+            label="Payment Method", value="Electronic check"),
         
         # Numeric features (important for churn prediction)
-        gr.Number(label="Tenure (months)", value=1, minimum=0, maximum=100),
+        gr.Number(label="Tenure (months)", value=1, minimum=0),
         gr.Number(label="Monthly Charges ($)", value=85.0, minimum=0, maximum=200),
         gr.Number(label="Total Charges ($)", value=85.0, minimum=0, maximum=10000),
+        gr.Dropdown([0, 1], label="Senior Citizen", value=0)
     ],
     outputs=gr.Textbox(label="Churn Prediction", lines=2),
     title="🔮 Telco Customer Churn Predictor",
@@ -202,16 +200,6 @@ demo = gr.Interface(
     💡 **Tip**: Month-to-month contracts with fiber optic internet and electronic check payments 
     tend to have higher churn rates.
     """,
-    examples=[
-        # High churn risk example
-        ["Female", "No", "No", "Yes", "No", "Fiber optic", "No", "No", "No", 
-         "No", "Yes", "Yes", "Month-to-month", "Yes", "Electronic check", 
-         1, 85.0, 85.0],
-        # Low churn risk example  
-        ["Male", "Yes", "Yes", "Yes", "Yes", "DSL", "Yes", "Yes", "Yes",
-         "Yes", "No", "No", "Two year", "No", "Credit card (automatic)",
-         60, 45.0, 2700.0]
-    ],
     theme=gr.themes.Soft()  # Professional appearance
 )
 
