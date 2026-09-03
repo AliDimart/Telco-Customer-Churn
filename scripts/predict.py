@@ -6,7 +6,7 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent
 sys.path.append(str(project_root))
 
-from src.models.inference import load_model, predict
+from src.inference.inference import load_model, predict
 
 
 model_path = project_root / "models" / "churn_pipeline.joblib"
