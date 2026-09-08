@@ -91,7 +91,7 @@ def main(args):
         X = df.drop(columns=[target])
         y = df[target]
 
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=args.test_size, random_state=101, stratify=y)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=args.test_size, random_state=42, stratify=y)
         
         # === STAGE 4: Creating Pipeline and evaluating the model ===
 

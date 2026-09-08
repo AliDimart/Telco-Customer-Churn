@@ -33,7 +33,7 @@ def main(args):
     X = df.drop(columns=[target])
     y = df[target]
 
-    X_train, _, y_train, _ = train_test_split(X, y, test_size=args.test_size, random_state=101, stratify=y)
+    X_train, _, y_train, _ = train_test_split(X, y, test_size=args.test_size, random_state=42, stratify=y)
 
     print("🔎 Starting hyperparameter tuning...")
     best_params = tune_model(X_train, y_train, threshold=args.threshold, n_trials=args.n_trials)
