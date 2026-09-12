@@ -7,7 +7,7 @@ from sklearn.metrics import recall_score
 
 from src.features.build_features import build_preprocessor
 
-def tune_model(X_train : pd.DataFrame, y_train : pd.Series, threshold : float = 0.35, n_trials: int = 30) -> dict:
+def tune_model(X_train : pd.DataFrame, y_train : pd.Series, threshold : float = 0.5, n_trials: int = 30) -> dict:
     """
     Tunes an XGBoost model using Optuna.
 
