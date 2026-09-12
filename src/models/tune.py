@@ -22,6 +22,8 @@ def tune_model(X_train : pd.DataFrame, y_train : pd.Series, threshold : float = 
     
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
+    scale_pos_weight = (y_train == 0).sum() / (y_train == 1).sum()
+
     def recall_with_threshold(estimator, X_val : pd.DataFrame, y_val : pd.Series) -> float:
         """
         Implements threshold to recall_score to focus on positive class.
@@ -45,6 +47,7 @@ def tune_model(X_train : pd.DataFrame, y_train : pd.Series, threshold : float = 
             "reg_alpha" : trial.suggest_float( "reg_alpha", 1e-8, 10.0, log=True), 
             "reg_lambda" : trial.suggest_float( "reg_lambda", 1e-8, 10.0, log=True),
 
+            "scale_pos_weight" : scale_pos_weight,
             "random_state" : 42,
             "n_jobs" : -1,
             "eval_metric" : "logloss"

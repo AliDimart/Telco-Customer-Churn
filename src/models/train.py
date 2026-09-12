@@ -17,15 +17,17 @@ def train_model(X_train: pd.DataFrame, y_train: pd.Series, params : dict = None)
     """
     default_params = {
         # Tree structure parameters
-        'n_estimators' : 301,        # Number of trees (OPTIMIZED)
-        'learning_rate' : 0.034,     # Step size shrinkage (OPTIMIZED)  
-        'max_depth' : 7,            # Maximum tree depth (OPTIMIZED)
+        'n_estimators' : 301,        # Number of trees
+        'learning_rate' : 0.034,     # Step size shrinkage   
+        'max_depth' : 7,             # Maximum tree depth 
+        "min_child_weight": 9,       # Minimum weight of childs to create a new leaf 
         
         # Regularization parameters
-        'subsample' : 0.95,         # Sample ratio of training instances
-        'colsample_bytree' : 0.98,  # Sample ratio of features for each tree
-        
-        'eval_metric' : "logloss",  # Evaluation metric
+        'subsample' : 0.95,          # Sample ratio of training instances
+        'colsample_bytree' : 0.98,   # Sample ratio of features for each tree
+        "gamma": 4.36,               # Minimum loss function reduction for creating a new leaf
+        "reg_alpha": 0.063,          # L1-regularization 
+        "reg_lambda": 0.087          # L2-regularization   
     }
 
     if params is None:
@@ -52,7 +54,8 @@ def train_model(X_train: pd.DataFrame, y_train: pd.Series, params : dict = None)
         random_state=42,        # Reproducible results
 
         # ESSENTIAL: Handle class imbalance
-        scale_pos_weight=scale_pos_weight  # Weight for positive class (churners)
+        scale_pos_weight=scale_pos_weight,  # Weight for positive class (churners)
+        eval_metric="logloss"
     )
     
     # Create pipeline to connect Preprocessor + XGBoost

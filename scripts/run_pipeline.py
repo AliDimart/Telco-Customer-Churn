@@ -101,7 +101,6 @@ def main(args):
 
         # Training preprocessor + xgboost
         pipeline = train_model(X_train, y_train, params)
-
         
         evaluate_model(pipeline, X_test, y_test, args.threshold)
 

@@ -15,6 +15,7 @@ def evaluate_model(model : Pipeline, X_test : pd.DataFrame, y_test : pd.Series, 
         model: Trained model
         X_test: Test features
         y_test: Test labels
+        threshold : Tuned threshold 
     """
     # Generate predictions 
     proba = model.predict_proba(X_test)[:, 1]  # Get probability of churn (class 1)
