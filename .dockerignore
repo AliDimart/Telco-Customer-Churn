@@ -1,0 +1,16 @@
+.git
+.github
+.venv
+__pycache__
+*.pyc
+
+notebooks
+.gradio
+
+mlruns
+mlartifacts
+
+data
+mlflow.db
+
+README.md
