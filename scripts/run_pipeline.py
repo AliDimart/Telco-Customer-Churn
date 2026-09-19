@@ -5,7 +5,7 @@ import json
 import joblib
 from pathlib import Path
 
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, cross_val_predict
 
 # === Fix import path for local modules ===
 # ESSENTIAL: Allows imports from src/ directory structure
@@ -16,7 +16,7 @@ sys.path.append(str(project_root))
 from src.data.load_data import load_data                   # Data loading with error handling
 from src.data.preprocess import preprocess_data            # Basic data cleaning
 from src.utils.validate_data import validate_telco_data    # Data quality validation
-from src.models.train import train_model                   # Model training
+from src.models.train import train_model, build_model      # Model training
 from src.models.evaluate import evaluate_model             # Model evaluation
 from src.models.find_threshold import find_threshold       # Threshold tunning
 
@@ -38,7 +38,7 @@ def main(args):
     Main training pipeline function that orchestrates the complete ML workflow.
 
     Runs sequentially: 
-        load → validate → preprocess → split → train → evaluate → log
+        load → validate → preprocess → split → train → choose threshold → evaluate → log
     """
     mlflow_uri = args.mlflow_uri or f"sqlite:///{project_root / 'mlflow.db'}"
     mlflow.set_tracking_uri(mlflow_uri)
@@ -47,8 +47,7 @@ def main(args):
     with mlflow.start_run():
         # === Log hyperparameters and configuration ===
 
-        # REQUIRED: These parameters are essential for model reproducibility
-        mlflow.log_param("model", "xgboost")           # Model type for comparison  
+        mlflow.log_param("model", "xgboost")    # Model type for comparison  
 
         # === STAGE 1: Data Loading & Validation ===
 
@@ -56,7 +55,7 @@ def main(args):
         df = load_data(args.input)  # Load raw CSV data with error handling
         print(f"✅ Data loaded: {df.shape[0]} rows, {df.shape[1]} columns")
 
-        # === CRITICAL: Data Quality Validation ===
+        # === Data Quality Validation ===
         # This step is ESSENTIAL for production ML - validates data quality before training
         print("🔍 Validating data quality with Great Expectations...")
         is_valid, failed = validate_telco_data(df)
@@ -91,9 +90,6 @@ def main(args):
         y = df[target]
 
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-
-        # We will use validation data to get best threshold
-        X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.25, random_state=42, stratify=y_train)
         
         # === STAGE 4: Creating Pipeline ===
 
@@ -101,13 +97,18 @@ def main(args):
         params_path = project_root / "artifacts" / "best_params.json"
         params = load_best_params(params_path)
 
-        # Training preprocessor + xgboost
-        pipeline = train_model(X_train, y_train, params)
+        # Creating preprocessor + xgboost
+        pipeline = build_model(X_train, y_train, params)
 
-        # === STAGE 5: Tunning THRESHOLD and evaluating the model ===
+        # === STAGE 5: THRESHOLD tunning and evaluating the model ===
 
-        threshold = find_threshold(pipeline, X_val, y_val)
-        mlflow.log_param("threshold", threshold)           # Saving threshold  
+        out_of_bag_proba = cross_val_predict(pipeline, X_train, y_train, cv=5, method='predict_proba')[:, 1]
+
+        threshold = find_threshold(y_train, out_of_bag_proba)
+        mlflow.log_param("threshold", threshold)    # Saving threshold
+
+        # Model training
+        pipeline.fit(X_train, y_train)
 
         evaluate_model(pipeline, X_test, y_test, threshold)
 

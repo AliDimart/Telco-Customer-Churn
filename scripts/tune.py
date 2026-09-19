@@ -22,6 +22,8 @@ def main(args):
     Runs sequentially: 
         load → tune → evaluate → log
     """
+    
+    # === STAGE 1: Data Loading ===
     print("🔄 Loading preprocessed data...")
     df = load_data(args.input)
 
@@ -30,10 +32,14 @@ def main(args):
     if target not in df.columns:
         raise ValueError(f"Target column '{target}' not found in data")
 
+    # === STAGE 2: Data Split  ===
+
     X = df.drop(columns=[target])
     y = df[target]
 
     X_train, _, y_train, _ = train_test_split(X, y, test_size=args.test_size, random_state=42, stratify=y)
+
+    # === STAGE 3: Hyperparameter Tuning & Saving ===
 
     print("🔎 Starting hyperparameter tuning...")
     best_params = tune_model(X_train, y_train, threshold=args.threshold, n_trials=args.n_trials)
@@ -56,9 +62,6 @@ if __name__ == "__main__":
     parser.add_argument("--threshold", type=float, default=0.35, help="Classification threshold")
     parser.add_argument("--test_size", type=float, default=0.2)
     parser.add_argument("--n-trials", type=int, default=30, help="Number of Optuna trials",)
-    parser.add_argument("--experiment", type=str, default="Telco Churn")
-    parser.add_argument("--mlflow_uri", type=str, default=None,
-                    help="override MLflow tracking URI, else uses project_root/mlruns")
 
     args = parser.parse_args()
 

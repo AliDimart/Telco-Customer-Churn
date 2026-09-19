@@ -20,8 +20,10 @@ def tune_model(X_train : pd.DataFrame, y_train : pd.Series, threshold : float = 
         Best hyperparameters found by Optuna.
     """
     
+    # We use cross_validation to get a more objective assessment
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
+    # Esentital because there is a significant imbalance among the classes 
     scale_pos_weight = (y_train == 0).sum() / (y_train == 1).sum()
 
     def recall_with_threshold(estimator, X_val : pd.DataFrame, y_val : pd.Series) -> float:
@@ -34,6 +36,7 @@ def tune_model(X_train : pd.DataFrame, y_train : pd.Series, threshold : float = 
 
         return recall_score(y_val, y_pred, zero_division=0)
 
+    # === Defenition of Objectiove for Optuna ===
 
     def objective(trial: optuna.Trial) -> float:
         params = {
@@ -53,14 +56,18 @@ def tune_model(X_train : pd.DataFrame, y_train : pd.Series, threshold : float = 
             "eval_metric" : "logloss"
         }
 
+        # Creating Pipeline
         pipeline = Pipeline([
             ("preprocessor", build_preprocessor(X_train)),
             ("model", XGBClassifier(**params)),
         ])
 
+        # Check configuration of params through cross_val
         scores = cross_val_score(pipeline, X_train, y_train, cv=cv, scoring=recall_with_threshold, n_jobs=1)
 
         return scores.mean()
+
+    # === Hyperparameters Tunning ===
 
     study = optuna.create_study(direction="maximize")
     study.optimize(objective, n_trials=n_trials)
