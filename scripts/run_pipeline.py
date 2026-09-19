@@ -18,6 +18,7 @@ from src.data.preprocess import preprocess_data            # Basic data cleaning
 from src.utils.validate_data import validate_telco_data    # Data quality validation
 from src.models.train import train_model                   # Model training
 from src.models.evaluate import evaluate_model             # Model evaluation
+from src.models.find_threshold import find_threshold       # Threshold tunning
 
 
 def load_best_params(path: Path) -> dict:
@@ -47,9 +48,7 @@ def main(args):
         # === Log hyperparameters and configuration ===
 
         # REQUIRED: These parameters are essential for model reproducibility
-        mlflow.log_param("model", "xgboost")           # Model type for comparison
-        mlflow.log_param("threshold", args.threshold)   # Classification threshold (default: 0.35)
-        mlflow.log_param("test_size", args.test_size)   # Train/test split ratio
+        mlflow.log_param("model", "xgboost")           # Model type for comparison  
 
         # === STAGE 1: Data Loading & Validation ===
 
@@ -91,9 +90,12 @@ def main(args):
         X = df.drop(columns=[target])
         y = df[target]
 
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=args.test_size, random_state=42, stratify=y)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+        # We will use validation data to get best threshold
+        X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.25, random_state=42, stratify=y_train)
         
-        # === STAGE 4: Creating Pipeline and evaluating the model ===
+        # === STAGE 4: Creating Pipeline ===
 
         # Trying to read params tuned by optuna
         params_path = project_root / "artifacts" / "best_params.json"
@@ -101,10 +103,15 @@ def main(args):
 
         # Training preprocessor + xgboost
         pipeline = train_model(X_train, y_train, params)
-        
-        evaluate_model(pipeline, X_test, y_test, args.threshold)
 
-        # === STAGE 5: Model Serialization and Logging ===
+        # === STAGE 5: Tunning THRESHOLD and evaluating the model ===
+
+        threshold = find_threshold(pipeline, X_val, y_val)
+        mlflow.log_param("threshold", threshold)           # Saving threshold  
+
+        evaluate_model(pipeline, X_test, y_test, threshold)
+
+        # === STAGE 6: Model Serialization and Logging ===
 
         print("💾 Saving model to MLflow...")
         # ESSENTIAL: Log model in MLflow's standard format for serving
@@ -119,7 +126,12 @@ def main(args):
         model_path = project_root / "models" / "churn_pipeline.joblib"
         model_path.parent.mkdir(parents=True, exist_ok=True)
 
-        joblib.dump(pipeline, model_path)
+        model_artifact = {
+            "model": pipeline,
+            "threshold": threshold
+        }
+
+        joblib.dump(model_artifact, model_path)
 
         print(f"✅ Model saved to {model_path}")
 
@@ -130,8 +142,6 @@ if __name__ == '__main__':
 
     p.add_argument("--input", type=str, default="data/raw/Telco-Customer-Churn.csv", help="Path to CSV")
     p.add_argument("--target", type=str, default="Churn")
-    p.add_argument("--threshold", type=float, default=0.35)
-    p.add_argument("--test_size", type=float, default=0.2)
     p.add_argument("--experiment", type=str, default="Telco Churn")
     p.add_argument("--mlflow_uri", type=str, default=None,
                     help="override MLflow tracking URI, else uses project_root/mlruns")

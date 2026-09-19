@@ -24,7 +24,10 @@ import gradio as gr
 from src.inference.inference import load_model, predict  # Core ML inference logic
 
 model_path = project_root / "models" / "churn_pipeline.joblib"
-model = load_model(model_path)
+artifact = load_model(model_path)
+
+model = artifact["model"]
+threshold = artifact["threshold"]
 
 
 # Initialize FastAPI application
