@@ -67,7 +67,6 @@ def build_model(X_train: pd.DataFrame, y_train: pd.Series, params: dict = None) 
     # === Handle Class Imbalance ===
     # Calculate scale_pos_weight to handle imbalanced dataset
     scale_pos_weight = (y_train == 0).sum() / (y_train == 1).sum()
-    mlflow.log_param("scale_pos_weight", scale_pos_weight)
 
     model = XGBClassifier(
         **params,

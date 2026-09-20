@@ -114,21 +114,23 @@ def main(args):
 
         # === STAGE 6: Model Serialization and Logging ===
 
+        # Create model with same parametrs and study it on the whole dataset 
+        model = train_model(X, y, params)
+
         print("💾 Saving model to MLflow...")
         # ESSENTIAL: Log model in MLflow's standard format for serving
         mlflow.sklearn.log_model(
-            pipeline,
-            name="churn_pipeline",  # This creates a 'model/' folder in MLflow run artifacts
+            model,
+            name="churn_model",  # This creates a 'model/' folder in MLflow run artifacts
             serialization_format="cloudpickle"
         )
         print("✅ Model saved to MLflow for serving pipeline")
 
-        # Saving model 
         model_path = project_root / "models" / "churn_pipeline.joblib"
         model_path.parent.mkdir(parents=True, exist_ok=True)
 
         model_artifact = {
-            "model": pipeline,
+            "model": model,
             "threshold": threshold
         }
 
