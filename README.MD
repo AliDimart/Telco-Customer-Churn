@@ -1,40 +1,16 @@
-## Telco Churn – End-to-End ML Project
-### Purpose
+## Telco Customer Churn Prediction. 
+Проект анализирует отток клиентов из телеком-компании. Данные: IBM Telco Churn из Kaggle (~7043 записей). Содержат демографию клиентов, информацию о сервисах (интернет, телефон, контракты), способах оплаты и целевой признак Churn (0/1).
 
-Build and ship a full machine-learning solution for predicting customer churn in a telecom setting—from data prep and modeling to an API + web UI.
+### Предобработка: 
+ - пропущенные значения в TotalCharges заменяются на 0 или медианное значение. Категориальные признаки (пол, контракт, оплата) преобразуются в числовые: бинарные в 0/1, остальные через one-hot encoding. Проведено масштабирование числовых признаков (например, tenure, MonthlyCharges) с помощью StandardScaler.
 
-### Problem solved & benefits
+Разделение: данные разделены на тренировочные и тестовые (train_test_split с stratify=y для несбалансированного целевого признака). Для оценки модели использовалась кросс-валидация (StratifiedKFold) и отбор гиперпараметров (GridSearchCV).
 
-- Faster decisions: Predicts which customers are likely to churn so teams can act before they leave.
-- Operationalized ML: Model is accessible via a REST API and a simple UI; anyone can test it without notebooks.
-- Traceable experiments: MLflow tracks runs, metrics, and artifacts for reproducibility and auditing.
+Модели и метрики: проверены несколько классификаторов (например, Logistic Regression, Random Forest, XGBoost). Классам применён oversampling (ADASYN) для балансировки классов. Выбор метрик обусловлен несбалансированностью: кроме accuracy оцениваются precision, recall и F1-score (F1 учитывает качество предсказаний для миноритарного класса), а также ROC-AUC для обобщённой оценки качеств классификатора.
 
-### What I built
+Запуск:
 
-- Data & Modeling: Feature engineering + XGBoost classifier; experiments logged to MLflow.
-- Model tracking: Runs, metrics, and the serialized model logged under a named MLflow experiment.
-- Inference service: FastAPI app exposing /predict (POST) and a root health check /.
-- Web UI: Gradio interface mounted at /ui for quick, shareable manual testing.
-- Containerization: Docker image with uvicorn entrypoint (src.app.main:app) listening on port 8000.
-
-### Roadblocks & how we solved them
-
-Module import error in container (ModuleNotFoundError: serving)
-
-- Cause: Python path in the image didn’t include src/.
-- Fixes: Set PYTHONPATH=/app/src in the Dockerfile; corrected uvicorn app path to src.app.main:app.
-
-Unhealthy targets behind ALB
-
-- Cause: App didn’t respond at the health-check path; listener/target port mismatches.
-- Fixes: Added GET / health endpoint; confirmed ALB listener on 80 forwards to TG on 8000; TG health check path set to /.
-
-ALB DNS timing out
-
-- Cause: Security group rules not aligned with traffic flow.
-- Fixes: ALB SG allows inbound 80 from 0.0.0.0/0; task SG allows inbound 8000 from the ALB SG; outbound open.
-
-Local testing vs. prod paths
-
-- Cause: MLflow artifact URIs differ locally vs. in container.
-- Fixes: For local dev, load via direct ./mlruns/.../artifacts/model; in prod, container loads the packaged model path used at build time.
+Установить зависимости: pip install -r requirements.txt.
+Запустить ноутбук eda.ipynb для анализа данных и визуализаций (см. графики распределения признаков).
+Затем train_model.py или соответствующий ноутбук для обучения моделей: убедиться, что выставлены random_state и сохранены модели в папку models/.
+Результаты (матрицы ошибок, ROC-кривые) сохраняются в reports/.

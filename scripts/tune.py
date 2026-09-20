@@ -37,7 +37,7 @@ def main(args):
     X = df.drop(columns=[target])
     y = df[target]
 
-    X_train, _, y_train, _ = train_test_split(X, y, test_size=args.test_size, random_state=42, stratify=y)
+    X_train, _, y_train, _ = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
     # === STAGE 3: Hyperparameter Tuning & Saving ===
 
@@ -60,7 +60,6 @@ if __name__ == "__main__":
     parser.add_argument("--input", type=str, default="data/processed/telco_churn_processed.csv", help="Path to CSV")
     parser.add_argument("--target", type=str, default="Churn")
     parser.add_argument("--threshold", type=float, default=0.35, help="Classification threshold")
-    parser.add_argument("--test_size", type=float, default=0.2)
     parser.add_argument("--n-trials", type=int, default=30, help="Number of Optuna trials",)
 
     args = parser.parse_args()
