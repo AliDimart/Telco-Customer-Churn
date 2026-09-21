@@ -9,6 +9,8 @@ Architecture:
 - FastAPI: High-performance REST API with automatic OpenAPI documentation
 - Gradio: User-friendly web UI for manual testing and demonstrations
 - Pydantic: Data validation and automatic API documentation
+
+To run: uvicorn src.app.main:app --reload
 """
 import sys
 import pandas as pd
@@ -154,7 +156,13 @@ def gradio_interface(
     # Call same inference pipeline as API endpoint
     customer = pd.DataFrame([data])
     result = predict(model, customer)
-    return str(result)  # Return as string for Gradio display
+    prediction = result[0][0]
+    probability = result[1][0]
+
+    if prediction == 1:
+        return f"⚠️ The client will likely leave the company.\nChurn probability: {probability:.1%}"
+    else:
+        return f"✅ The client will likely stay in the company.\nChurn probability: {probability:.1%}"
 
 
 # === GRADIO UI CONFIGURATION ===
@@ -200,7 +208,7 @@ demo = gr.Interface(
     Fill in the customer details below to get a churn prediction. The model uses XGBoost trained on 
     historical telecom customer data to identify customers at risk of churning.
     
-    💡 **Tip**: Month-to-month contracts with fiber optic internet and electronic check payments 
+    💡 Tip: Month-to-month contracts with fiber optic internet and electronic check payments 
     tend to have higher churn rates.
     """,
     theme=gr.themes.Soft()  # Professional appearance

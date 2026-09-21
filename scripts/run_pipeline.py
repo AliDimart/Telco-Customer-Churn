@@ -111,7 +111,7 @@ def main(args):
         pipeline.fit(X_train, y_train)
 
         evaluate_model(pipeline, X_test, y_test, threshold)
-
+        
         # === STAGE 6: Model Serialization and Logging ===
 
         # Create model with same parametrs and study it on the whole dataset 
